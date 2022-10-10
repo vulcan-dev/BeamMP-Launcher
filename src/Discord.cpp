@@ -11,14 +11,17 @@
 #include <thread>
 #include <ctime>
 
-struct DInfo{
+struct DInfo {
     std::string Name;
     std::string Tag;
     std::string DID;
 };
-DInfo* DiscordInfo = nullptr;
+DInfo *DiscordInfo = nullptr;
+bool DiscordErrored = false;
 int64_t StartTime;
-void updateDiscordPresence(){
+std::unique_ptr<std::thread> DiscordThread;
+
+void updateDiscordPresence() {
     //if (SendPresence) {
     //char buffer[256];
     DiscordRichPresence discordPresence;
@@ -45,14 +48,16 @@ void updateDiscordPresence(){
     // Discord_ClearPresence();
     //}
 }
-void handleDiscordReady(const DiscordUser* User){
-    DiscordInfo = new DInfo{
+
+void handleDiscordReady(const DiscordUser *User) {
+    DiscordInfo = new DInfo { // TODO: delete to prevent memory leak
         User->username,
         User->discriminator,
         User->userId
     };
 }
-void discordInit(){
+
+void discordInit() {
     DiscordEventHandlers handlers;
     memset(&handlers, 0, sizeof(handlers));
     handlers.ready = handleDiscordReady;
@@ -61,46 +66,66 @@ void discordInit(){
     handlers.joinGame = handleDiscordJoin;
     handlers.spectateGame = handleDiscordSpectate;
     handlers.joinRequest = handleDiscordJoinRequest;*/
-    Discord_Initialize("629743237988352010", &handlers, 1,nullptr);
-}
-[[noreturn]] void Loop(){
-    StartTime = time(nullptr);
-    while (true) {
-        updateDiscordPresence();
-        #ifdef DISCORD_DISABLE_IO_THREAD
-            Discord_UpdateConnection();
-        #endif
-        Discord_RunCallbacks();
-        if(DiscordInfo == nullptr){
-            std::this_thread::sleep_for(std::chrono::milliseconds(250));
-        }else std::this_thread::sleep_for(std::chrono::seconds(2));
+    try {
+        Discord_Initialize("629743237988352010", &handlers, 1, nullptr);
+    } catch (std::exception &e) {
+        DiscordErrored = true;
+        log_error("Discord initialization failed: %s", e.what());
     }
 }
 
-void DMain(){
+void Loop() {
+    StartTime = time(nullptr);
+    try {
+        while (true) {
+            if (DiscordErrored)
+                break;
+            updateDiscordPresence();
+#ifdef DISCORD_DISABLE_IO_THREAD
+            Discord_UpdateConnection();
+#endif
+            Discord_RunCallbacks();
+            if (DiscordInfo == nullptr) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            } else std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+    } catch (std::exception& e){
+        log_error("Discord Loop : %s", e.what());
+        DiscordErrored = true;
+    }
+}
+
+void DMain() {
     discordInit();
     Loop();
 }
-std::string GetDName(){
+
+std::string GetDName() {
     return DiscordInfo->Name;
 }
-std::string GetDTag(){
+
+std::string GetDTag() {
     return DiscordInfo->Tag;
 }
-std::string GetDID(){
+
+std::string GetDID() {
     return DiscordInfo->DID;
 }
-void DAboard(){
+
+void DAboard() {
     DiscordInfo = nullptr;
 }
-void ErrorAboard(){
+
+void ErrorAboard() {
     log_error("Discord timeout! please start the discord app and try again after 30 secs");
     std::this_thread::sleep_for(std::chrono::seconds(5));
     exit(6);
 }
-void Discord_Main(){
-    std::thread t1(DMain);
-    t1.detach();
+
+void Discord_Main() {
+    DiscordThread = std::make_unique<std::thread>(DMain);
+    DiscordThread->detach();
+    log_debug("Connecting to Discord...");
     /*info("Connecting to discord client...");
     int C = 0;
     while(DiscordInfo == nullptr && C < 80){
