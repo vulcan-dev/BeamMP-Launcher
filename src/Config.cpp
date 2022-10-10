@@ -15,7 +15,7 @@ std::string Branch;
 
 void ParseConfig(const json::Document &d) {
     if (d["Port"].IsInt()) {
-        DEFAULT_PORT = d["Port"].GetInt();
+        GAME_PORT = d["Port"].GetInt();
     }
     //Default -1
     //Release 1

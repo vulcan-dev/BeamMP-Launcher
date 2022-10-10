@@ -133,8 +133,8 @@ void CustomPort(int argc, char *argv[]) {
         std::string Port = argv[1];
         if (Port.find_first_not_of("0123456789") == std::string::npos) {
             if (std::stoi(Port) > 1000) {
-                DEFAULT_PORT = std::stoi(Port);
-                log_warn("Running on custom port : %d", DEFAULT_PORT);
+                GAME_PORT = std::stoi(Port);
+                log_warn("Running on custom port : %d", GAME_PORT);
             }
         }
 

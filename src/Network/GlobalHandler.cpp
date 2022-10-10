@@ -124,7 +124,7 @@ SOCKET SetupListener(){
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
-    iRes = getaddrinfo(nullptr, std::to_string(DEFAULT_PORT+1).c_str(), &hints, &result);
+    iRes = getaddrinfo(nullptr, std::to_string(GAME_PORT + 1).c_str(), &hints, &result);
     if (iRes != 0) {
         log_error("(Proxy) info failed with error: %d", iRes);
         WSACleanup();
