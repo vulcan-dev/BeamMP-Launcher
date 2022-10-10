@@ -18,7 +18,7 @@
 #include <set>
 
 extern int TraceBack;
-std::set<std::string>* ConfList = nullptr;
+std::set<std::string> *ConfList = nullptr;
 bool TCPTerminate = false;
 int DEFAULT_PORT = 4444;
 bool Terminate = false;
@@ -28,10 +28,10 @@ std::string MStatus;
 bool ModLoaded;
 int ping = -1;
 
-void StartSync(const std::string &Data){
-    std::string IP = GetAddr(Data.substr(1,Data.find(':')-1));
-    if(IP.find('.') == -1){
-        if(IP == "DNS")UlStatus ="UlConnection Failed! (DNS Lookup Failed)";
+void StartSync(const std::string &Data) {
+    std::string IP = GetAddr(Data.substr(1, Data.find(':') - 1));
+    if (IP.find('.') == -1) {
+        if (IP == "DNS")UlStatus = "UlConnection Failed! (DNS Lookup Failed)";
         else UlStatus = "UlConnection Failed! (WSA failed to start)";
         ListOfMods = "-";
         Terminate = true;
@@ -43,16 +43,17 @@ void StartSync(const std::string &Data){
     Terminate = false;
     ConfList->clear();
     ping = -1;
-    std::thread GS(TCPGameServer,IP,std::stoi(Data.substr(Data.find(':')+1)));
+    std::thread GS(TCPGameServer, IP, std::stoi(Data.substr(Data.find(':') + 1)));
     GS.detach();
-    info("Connecting to server");
+    log_info("Connecting to server");
 }
-void Parse(std::string Data,SOCKET CSocket){
+
+void Parse(std::string Data, SOCKET CSocket) {
     char Code = Data.at(0), SubCode = 0;
-    if(Data.length() > 1)SubCode = Data.at(1);
-    switch (Code){
+    if (Data.length() > 1)SubCode = Data.at(1);
+    switch (Code) {
         case 'A':
-            Data = Data.substr(0,1);
+            Data = Data.substr(0, 1);
             break;
         case 'B':
             NetReset();
@@ -63,22 +64,22 @@ void Parse(std::string Data,SOCKET CSocket){
         case 'C':
             ListOfMods.clear();
             StartSync(Data);
-            while(ListOfMods.empty() && !Terminate){
+            while (ListOfMods.empty() && !Terminate) {
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
-            if(ListOfMods == "-")Data = "L";
-            else Data = "L"+ListOfMods;
+            if (ListOfMods == "-")Data = "L";
+            else Data = "L" + ListOfMods;
             break;
         case 'U':
-            if(SubCode == 'l')Data = UlStatus;
-            if(SubCode == 'p'){
-                if(ping > 800){
+            if (SubCode == 'l')Data = UlStatus;
+            if (SubCode == 'p') {
+                if (ping > 800) {
                     Data = "Up-2";
-                }else Data = "Up" + std::to_string(ping);
+                } else Data = "Up" + std::to_string(ping);
             }
-            if(!SubCode){
+            if (!SubCode) {
                 std::string Ping;
-                if(ping > 800)Ping = "-2";
+                if (ping > 800)Ping = "-2";
                 else Ping = std::to_string(ping);
                 Data = std::string(UlStatus) + "\n" + "Up" + Ping;
             }
@@ -87,17 +88,17 @@ void Parse(std::string Data,SOCKET CSocket){
             Data = MStatus;
             break;
         case 'Q':
-            if(SubCode == 'S'){
+            if (SubCode == 'S') {
                 NetReset();
                 Terminate = true;
                 TCPTerminate = true;
                 ping = -1;
             }
-            if(SubCode == 'G')exit(2);
+            if (SubCode == 'G')exit(2);
             Data.clear();
             break;
         case 'R': //will send mod name
-            if(ConfList->find(Data) == ConfList->end()){
+            if (ConfList->find(Data) == ConfList->end()) {
                 ConfList->insert(Data);
                 ModLoaded = true;
             }
@@ -107,9 +108,9 @@ void Parse(std::string Data,SOCKET CSocket){
             Data = "Z" + GetVer();
             break;
         case 'N':
-            if (SubCode == 'c'){
-                Data = "N{\"Auth\":"+std::to_string(LoginAuth)+"}";
-            }else{
+            if (SubCode == 'c') {
+                Data = "N{\"Auth\":" + std::to_string(LoginAuth) + "}";
+            } else {
                 Data = "N" + Login(Data.substr(Data.find(':') + 1));
             }
             break;
@@ -117,137 +118,150 @@ void Parse(std::string Data,SOCKET CSocket){
             Data.clear();
             break;
     }
-    if(!Data.empty() && CSocket != -1){
-        int res = send(CSocket, (Data+"\n").c_str(), int(Data.size())+1, 0);
-        if(res < 0){
-            debug("(Core) send failed with error: " + std::to_string(WSAGetLastError()));
+    if (!Data.empty() && CSocket != -1) {
+        int res = send(CSocket, (Data + "\n").c_str(), int(Data.size()) + 1, 0);
+        if (res < 0) {
+            log_error("(Core) send failed with error: %s", wsa_get_err_str());
         }
     }
 }
-void GameHandler(SOCKET Client){
 
-    int32_t Size,Temp,Rcv;
+void GameHandler(SOCKET Client) {
+
+    int32_t Size, Temp, Rcv;
     char Header[10] = {0};
-    do{
+    do {
         Rcv = 0;
-        do{
-            Temp = recv(Client,&Header[Rcv],1,0);
-            if(Temp < 1)break;
-            if(!isdigit(Header[Rcv]) && Header[Rcv] != '>') {
-                error("(Core) Invalid lua communication");
+        do {
+            Temp = recv(Client, &Header[Rcv], 1, 0);
+            if (Temp < 1)break;
+            if (!isdigit(Header[Rcv]) && Header[Rcv] != '>') {
+                log_error("(Core) Invalid lua communication");
                 KillSocket(Client);
                 return;
             }
-        }while(Header[Rcv++] != '>');
-        if(Temp < 1)break;
-        if(std::from_chars(Header,&Header[Rcv],Size).ptr[0] != '>'){
-            debug("(Core) Invalid lua Header -> " + std::string(Header,Rcv));
+        } while (Header[Rcv++] != '>');
+        if (Temp < 1)break;
+        if (std::from_chars(Header, &Header[Rcv], Size).ptr[0] != '>') {
+            log_debug("(Core) Invalid lua Header -> %s - %d", Header, Rcv);
             break;
         }
-        std::string Ret(Size,0);
+        std::string Ret(Size, 0);
         Rcv = 0;
 
-        do{
-            Temp = recv(Client,&Ret[Rcv],Size-Rcv,0);
-            if(Temp < 1)break;
+        do {
+            Temp = recv(Client, &Ret[Rcv], Size - Rcv, 0);
+            if (Temp < 1)break;
             Rcv += Temp;
-        }while(Rcv < Size);
-        if(Temp < 1)break;
+        } while (Rcv < Size);
+        if (Temp < 1)break;
 
         std::thread Respond(Parse, Ret, Client);
         Respond.detach();
-    }while(Temp > 0);
+    } while (Temp > 0);
     if (Temp == 0) {
-        debug("(Core) Connection closing");
+        log_debug("(Core) Connection closing");
     } else {
-        debug("(Core) recv failed with error: " + std::to_string(WSAGetLastError()));
+        log_debug("(Core) recv failed with error: %s", wsa_get_err_str());
     }
     NetReset();
     KillSocket(Client);
 }
-void localRes(){
+
+void localRes() {
     MStatus = " ";
     UlStatus = "Ulstart";
-    if(ConfList != nullptr){
+    if (ConfList != nullptr) {
         ConfList->clear();
         delete ConfList;
         ConfList = nullptr;
     }
     ConfList = new std::set<std::string>;
 }
+
 void CoreMain() {
-    debug("Core Network on start!");
+    log_debug("Core Network on start!");
     WSADATA wsaData;
-    SOCKET LSocket,CSocket;
+    SOCKET LSocket, CSocket;
     struct addrinfo *res = nullptr;
     struct addrinfo hints{};
     int iRes = WSAStartup(514, &wsaData); //2.2
-    if (iRes)debug("WSAStartup failed with error: " + std::to_string(iRes));
+    if (iRes)log_debug("WSAStartup failed with error: %d", iRes);
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
     iRes = getaddrinfo(nullptr, std::to_string(DEFAULT_PORT).c_str(), &hints, &res);
-    if (iRes){
-        debug("(Core) addr info failed with error: " + std::to_string(iRes));
+
+    if (iRes) {
+        log_debug("(Core) addr info failed with error: %d", iRes);
         WSACleanup();
         return;
     }
+
     LSocket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (LSocket == -1){
-        debug("(Core) socket failed with error: " + std::to_string(WSAGetLastError()));
+    if (LSocket == -1) {
+        log_debug("(Core) socket failed with error: %s", wsa_get_err_str());
         freeaddrinfo(res);
         WSACleanup();
         return;
     }
+
     iRes = bind(LSocket, res->ai_addr, int(res->ai_addrlen));
     if (iRes == SOCKET_ERROR) {
-        error("(Core) bind failed with error: " + std::to_string(WSAGetLastError()));
+        log_error("(Core) bind failed with error: %s", wsa_get_err_str());
         freeaddrinfo(res);
         KillSocket(LSocket);
         WSACleanup();
         return;
     }
+
     iRes = listen(LSocket, SOMAXCONN);
     if (iRes == SOCKET_ERROR) {
-        debug("(Core) listen failed with error: " + std::to_string(WSAGetLastError()));
+        log_debug("(Core) listen failed with error: %s", wsa_get_err_str());
         freeaddrinfo(res);
         KillSocket(LSocket);
         WSACleanup();
         return;
     }
-    do{
+
+    do {
         CSocket = accept(LSocket, nullptr, nullptr);
         if (CSocket == -1) {
-            error("(Core) accept failed with error: " + std::to_string(WSAGetLastError()));
+            log_error("(Core) accept failed with error: %s", wsa_get_err_str());
             continue;
         }
+
         localRes();
-        info("Game Connected!");
+        log_info("Game Connected!");
         GameHandler(CSocket);
-        warn("Game Reconnecting...");
-    }while(CSocket);
+        log_warn("Game Reconnecting...");
+    } while (CSocket);
+
     KillSocket(LSocket);
     WSACleanup();
 }
-int Handle(EXCEPTION_POINTERS *ep){
-    char* hex = new char[100];
-    sprintf_s(hex,100, "%lX", ep->ExceptionRecord->ExceptionCode);
-    except("(Core) Code : " + std::string(hex));
-    delete [] hex;
+
+int Handle(EXCEPTION_POINTERS *ep) {
+    char *hex = new char[100];
+    sprintf_s(hex, 100, "%lX", ep->ExceptionRecord->ExceptionCode);
+    log_exception("(Core) Code : %s", hex);
+    delete[] hex;
     return 1;
 }
 
 
-[[noreturn]] void CoreNetwork(){
-    while(true) {
+[[noreturn]] void CoreNetwork() {
+    while (true) {
 #ifndef __MINGW32__
         __try{
 #endif
-                CoreMain();
+            CoreMain();
 #ifndef __MINGW32__
-        }__except(Handle(GetExceptionInformation())){}
+        }
+        __except(Handle(GetExceptionInformation()))
+        {}
 #endif
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }

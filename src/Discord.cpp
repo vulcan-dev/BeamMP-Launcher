@@ -94,7 +94,7 @@ void DAboard(){
     DiscordInfo = nullptr;
 }
 void ErrorAboard(){
-    error("Discord timeout! please start the discord app and try again after 30 secs");
+    log_error("Discord timeout! please start the discord app and try again after 30 secs");
     std::this_thread::sleep_for(std::chrono::seconds(5));
     exit(6);
 }

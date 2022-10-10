@@ -17,14 +17,16 @@ std::string PublicKey;
 extern bool LoginAuth;
 std::string Role;
 
-void UpdateKey(const char* newKey){
-    if(newKey && std::isalnum(newKey[0])){
+void UpdateKey(const char *newKey) {
+    if (newKey && std::isalnum(newKey[0])) {
         std::ofstream Key("key");
-        if(Key.is_open()){
+        if (Key.is_open()) {
             Key << newKey;
             Key.close();
-        }else fatal("Cannot write to disk!");
-    }else if(fs::exists("key")){
+        } else {
+            log_fatal("Cannot write to disk!");
+        }
+    } else if (fs::exists("key")) {
         remove("key");
     }
 }
@@ -33,42 +35,45 @@ void UpdateKey(const char* newKey){
 /// "Guest":"Name"
 /// "pk":"private_key"
 
-std::string GetFail(const std::string& R){
+std::string GetFail(const std::string &R) {
     std::string DRet = R"({"success":false,"message":)";
-    DRet += "\""+R+"\"}";
-    error(R);
+    DRet += "\"" + R + "\"}";
+    log_error("Login Failed! %s", R.c_str());
     return DRet;
 }
 
-std::string Login(const std::string& fields){
-    if(fields == "LO"){
+std::string Login(const std::string &fields) {
+    if (fields == "LO") {
         LoginAuth = false;
         UpdateKey(nullptr);
         return "";
     }
-    info("Attempting to authenticate...");
+    log_info("Attempting to authenticate...");
     std::string Buffer = HTTP::Post("https://auth.beammp.com/userlogin", fields);
     json::Document d;
     d.Parse(Buffer.c_str());
-    if(Buffer == "-1"){
+    if (Buffer == "-1") {
         return GetFail("Failed to communicate with the auth system!");
     }
 
     if (Buffer.at(0) != '{' || d.HasParseError()) {
-        error(Buffer);
+        log_error("Failed to parse JSON! %s", Buffer.c_str());
         return GetFail("Invalid answer from authentication servers, please try again later!");
     }
-    if(!d["success"].IsNull() && d["success"].GetBool()){
+    if (!d["success"].IsNull() && d["success"].GetBool()) {
         LoginAuth = true;
-        if(!d["private_key"].IsNull()){
+        if (!d["private_key"].IsNull()) {
             UpdateKey(d["private_key"].GetString());
         }
-        if(!d["public_key"].IsNull()){
+        if (!d["public_key"].IsNull()) {
             PublicKey = d["public_key"].GetString();
         }
-        info("Authentication successful!");
-    }else info("Authentication failed!");
-    if(!d["message"].IsNull()){
+        log_info("Authentication successful!");
+    } else {
+        log_error("Authentication failed!");
+    }
+
+    if (!d["message"].IsNull()) {
         d.RemoveMember("private_key");
         d.RemoveMember("public_key");
         rapidjson::StringBuffer buffer;
@@ -79,20 +84,20 @@ std::string Login(const std::string& fields){
     return GetFail("Invalid message parsing!");
 }
 
-void CheckLocalKey(){
-    if(fs::exists("key") && fs::file_size("key") < 100){
+void CheckLocalKey() {
+    if (fs::exists("key") && fs::file_size("key") < 100) {
         std::ifstream Key("key");
-        if(Key.is_open()) {
+        if (Key.is_open()) {
             auto Size = fs::file_size("key");
             std::string Buffer(Size, 0);
             Key.read(&Buffer[0], Size);
             Key.close();
 
-            for (char& c : Buffer) {
-              if (!std::isalnum(c) && c != '-') {
-                UpdateKey(nullptr);
-                return;
-              }
+            for (char &c: Buffer) {
+                if (!std::isalnum(c) && c != '-') {
+                    UpdateKey(nullptr);
+                    return;
+                }
             }
 
             Buffer = HTTP::Post("https://auth.beammp.com/userlogin", R"({"pk":")" + Buffer + "\"}");
@@ -100,23 +105,23 @@ void CheckLocalKey(){
             json::Document d;
             d.Parse(Buffer.c_str());
             if (Buffer == "-1" || Buffer.at(0) != '{' || d.HasParseError()) {
-                error(Buffer);
-                info("Invalid answer from authentication servers.");
+                log_error(Buffer.c_str());
+                log_warn("Invalid answer from authentication servers.");
                 UpdateKey(nullptr);
             }
-            if(d["success"].GetBool()){
+            if (d["success"].GetBool()) {
                 LoginAuth = true;
                 UpdateKey(d["private_key"].GetString());
                 PublicKey = d["public_key"].GetString();
                 Role = d["role"].GetString();
                 //info(Role);
-            }else{
-                info("Auto-Authentication unsuccessful please re-login!");
+            } else {
+                log_warn("Auto-Authentication unsuccessful please re-login!");
                 UpdateKey(nullptr);
             }
-        }else{
-            warn("Could not open saved key!");
+        } else {
+            log_warn("Could not open saved key!");
             UpdateKey(nullptr);
         }
-    }else UpdateKey(nullptr);
+    } else UpdateKey(nullptr);
 }

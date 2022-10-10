@@ -11,72 +11,92 @@
 #include <fstream>
 #include <sstream>
 #include <chrono>
-#include <thread>
+#include <WinSock2.h>
+#include <iomanip>
 
 std::string getDate() {
-    time_t tt = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    tm local_tm = *localtime(&tt);
-    std::stringstream date;
-    int S = local_tm.tm_sec;
-    int M = local_tm.tm_min;
-    int H = local_tm.tm_hour;
-    std::string Secs = (S > 9 ? std::to_string(S) : "0" + std::to_string(S));
-    std::string Min = (M > 9 ? std::to_string(M) : "0" + std::to_string(M));
-    std::string Hour = (H > 9 ? std::to_string(H) : "0" + std::to_string(H));
-    date
-            << "["
-            << local_tm.tm_mday << "/"
-            << local_tm.tm_mon + 1 << "/"
-            << local_tm.tm_year + 1900 << " "
-            << Hour << ":"
-            << Min << ":"
-            << Secs
-            << "] ";
-    return date.str();
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    tm buf{};
+    localtime_s(&buf, &in_time_t);
+    ss << std::put_time(&buf, "[%d/%m/%Y %H:%M:%S] ");
+    return ss.str();
 }
+
 void InitLog(){
     std::ofstream LFS;
     LFS.open(GetEP() + "Launcher.log");
-    if(!LFS.is_open()){
-        error("logger file init failed!");
-    }else LFS.close();
+    if (!LFS.is_open()) {
+        printf("Failed to open log file!");
+    } else {
+        LFS.close();
+    }
 }
-void addToLog(const std::string& Line){
-    std::ofstream LFS;
-    LFS.open(GetEP() + "Launcher.log", std::ios_base::app);
-    LFS << Line.c_str();
-    LFS.close();
+
+void addToLog(const std::string& line){
+    std::ofstream logFile;
+    logFile.open(GetEP() + "Launcher.log", std::ios_base::app);
+    logFile << line.c_str();
+    logFile.close();
 }
-void info(const std::string& toPrint) {
-    std::string Print = getDate() + "[INFO] " + toPrint + "\n";
-    std::cout << Print;
-    addToLog(Print);
+
+const char* wsa_get_err_str() {
+    DWORD err = WSAGetLastError();
+    const char* err_str = "Unknown error";
+
+    FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr,
+        err,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPSTR)&err_str,
+        0,
+        nullptr
+    );
+
+    return err_str;
 }
-void debug(const std::string& toPrint) {
-    if(!Dev)return;
-    std::string Print = getDate() + "[DEBUG] " + toPrint + "\n";
-    std::cout << Print;
-    addToLog(Print);
-}
-void warn(const std::string& toPrint){
-    std::string Print = getDate() + "[WARN] " + toPrint + "\n";
-    std::cout << Print;
-    addToLog(Print);
-}
-void error(const std::string& toPrint) {
-    std::string Print = getDate() + "[ERROR] " + toPrint + "\n";
-    std::cout << Print;
-    addToLog(Print);
-}
-void fatal(const std::string& toPrint) {
-    std::string Print = getDate() + "[FATAL] " + toPrint + "\n";
-    std::cout << Print;
-    addToLog(Print);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    _Exit(-1);
-}
-void except(const std::string& toPrint) {
-    std::string Print = getDate() + "[EXCEP] " + toPrint + "\n";
-    std::cout << Print;
-    addToLog(Print);
+
+void log(LogLevel level, const char* message, bool new_line) {
+    const char* level_str = "";
+    switch (level) {
+        case LogLevel::Verbose:
+            level_str = "[VERBOSE]";
+            break;
+        case LogLevel::Debug:
+            level_str = "[DEBUG]";
+            break;
+        case LogLevel::Info:
+            level_str = "[INFO]";
+            break;
+        case LogLevel::Warning:
+            level_str = "[WARN]";
+            break;
+        case LogLevel::Error:
+            level_str = "[ERROR]";
+            break;
+        case LogLevel::Exception:
+            level_str = "[EXCEPTION]";
+            break;
+        case LogLevel::Fatal:
+            level_str = "[FATAL]";
+            break;
+        default:
+            level_str = "[UNKNOWN]";
+            break;
+    }
+
+    if (!Dev && level == LogLevel::Debug)
+        return;
+
+    if (!Verbose && level == LogLevel::Verbose)
+        return;
+
+    std::string output = getDate() + level_str + " " + message + (new_line ? "\n" : "");
+    if (level == LogLevel::Fatal) {
+        output += "Closing in 5 seconds...";
+    }
+    std::cout << output;
+    addToLog(output);
 }

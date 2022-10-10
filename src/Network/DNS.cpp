@@ -8,24 +8,29 @@
 
 #include <string>
 #include <winsock2.h>
+#include <WS2tcpip.h>
 #include "Logger.h"
 
 std::string GetAddr(const std::string&IP){
     if(IP.find_first_not_of("0123456789.") == -1)return IP;
     WSADATA wsaData;
-    hostent *host;
     if(WSAStartup(514, &wsaData) != 0){
-        error("WSA Startup Failed!");
+        log_error("WSA Startup Failed!");
         WSACleanup();
         return "";
     }
-    host = gethostbyname(IP.c_str());
-    if(!host){
-        error("DNS lookup failed! on " + IP);
+
+    addrinfo *result = nullptr, *ptr = nullptr, hints{};
+    ZeroMemory(&hints, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo(IP.c_str(), "http", &hints, &result) != 0) {
+        log_error("getaddrinfo failed with error: %s", wsa_get_err_str());
         WSACleanup();
-        return "DNS";
+        return "";
     }
-    std::string Ret = inet_ntoa(*((struct in_addr *)host->h_addr));
+    std::string Ret = inet_ntop(result->ai_family, &((sockaddr_in*)result->ai_addr)->sin_addr, new char[INET_ADDRSTRLEN], INET_ADDRSTRLEN);
     WSACleanup();
     return Ret;
 }

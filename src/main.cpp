@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     try {
         LegitimacyCheck();
     }catch (std::exception& e){
-        fatal("Main 1 : " + std::string(e.what()));
+        log_fatal("Main 1 : %s", e.what());
     }
 
     PreGame(GetGameDir());

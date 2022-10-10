@@ -23,7 +23,12 @@ if (WIN32)
     set(VcpkgRoot ${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET})
     include_directories(${VcpkgRoot}/include)
     link_directories(${VcpkgRoot}/lib)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${VcpkgRoot}/lib/discord-rpc.lib
+    if (CMAKE_BUILD_TYPE MATCHES Debug) # for discord-rpc
+        set(VcpkgLibDir "debug")
+    else()
+        set(VcpkgLibDir "")
+    endif()
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${VcpkgRoot}/${VcpkgLibDir}/lib/discord-rpc.lib
             ZLIB::ZLIB OpenSSL::SSL OpenSSL::Crypto ws2_32)
 else(WIN32) #MINGW
     add_definitions("-D_WIN32_WINNT=0x0600")

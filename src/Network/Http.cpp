@@ -16,18 +16,19 @@
 #include <httplib.h>
 
 std::string HTTP::Codes_[] =
-{
- "Success","Unknown","Connection","BindIPAddress",
- "Read","Write","ExceedRedirectCount","Canceled",
- "SSLConnection","SSLLoadingCerts","SSLServerVerification",
- "UnsupportedMultipartBoundaryChars","Compression"
-};
+    {
+        "Success", "Unknown", "Connection", "BindIPAddress",
+        "Read", "Write", "ExceedRedirectCount", "Canceled",
+        "SSLConnection", "SSLLoadingCerts", "SSLServerVerification",
+        "UnsupportedMultipartBoundaryChars", "Compression"
+    };
 bool HTTP::isDownload = false;
+
 std::string HTTP::Get(const std::string &IP) {
     static std::mutex Lock;
     std::scoped_lock Guard(Lock);
 
-    auto pos = IP.find('/',10);
+    auto pos = IP.find('/', 10);
 
     httplib::Client cli(IP.substr(0, pos).c_str());
     cli.set_connection_timeout(std::chrono::seconds(10));
@@ -35,60 +36,62 @@ std::string HTTP::Get(const std::string &IP) {
     auto res = cli.Get(IP.substr(pos).c_str(), ProgressBar);
     std::string Ret;
 
-    if(res.error() == 0){
-        if(res->status == 200){
+    if (res.error() == 0) {
+        if (res->status == 200) {
             Ret = res->body;
-        }else error(res->reason);
+        } else {
+            log_error("HTTP Error: %s", Codes_[res->status].c_str());
+        }
 
-    }else{
-        if(isDownload) {
+    } else {
+        if (isDownload) {
             std::cout << "\n";
         }
-        error("HTTP Get failed on " + Codes_[res.error()]);
+        log_error("HTTP Get failed on %s", Codes_[res.error()]);
     }
 
     return Ret;
 }
 
-std::string HTTP::Post(const std::string& IP, const std::string& Fields) {
+std::string HTTP::Post(const std::string &IP, const std::string &Fields) {
     static std::mutex Lock;
     std::scoped_lock Guard(Lock);
 
-    auto pos = IP.find('/',10);
+    auto pos = IP.find('/', 10);
 
     httplib::Client cli(IP.substr(0, pos).c_str());
     cli.set_connection_timeout(std::chrono::seconds(10));
     std::string Ret;
 
-    if(!Fields.empty()) {
+    if (!Fields.empty()) {
         httplib::Result res = cli.Post(IP.substr(pos).c_str(), Fields, "application/json");
 
-        if(res.error() == 0) {
+        if (res.error() == 0) {
             if (res->status != 200) {
-                error(res->reason);
+                log_error("HTTP Error: %s", Codes_[res->status].c_str());
             }
             Ret = res->body;
-        }else{
-            error("HTTP Post failed on " + Codes_[res.error()]);
+        } else {
+            log_error("HTTP Post failed on %s", Codes_[res.error()]);
         }
-    }else{
+    } else {
         httplib::Result res = cli.Post(IP.substr(pos).c_str());
-        if(res.error() == 0) {
+        if (res.error() == 0) {
             if (res->status != 200) {
-                error(res->reason);
+                log_error("HTTP Error: %s", Codes_[res->status].c_str());
             }
             Ret = res->body;
-        }else{
-            error("HTTP Post failed on " + Codes_[res.error()]);
+        } else {
+            log_error("HTTP Post failed on %s", Codes_[res.error()]);
         }
     }
 
-    if(Ret.empty())return "-1";
+    if (Ret.empty())return "-1";
     else return Ret;
 }
 
-bool HTTP::ProgressBar(size_t c, size_t t){
-    if(isDownload) {
+bool HTTP::ProgressBar(size_t c, size_t t) {
+    if (isDownload) {
         static double last_progress, progress_bar_adv;
         progress_bar_adv = round(c / double(t) * 25);
         std::cout << "\r";
@@ -112,16 +115,16 @@ bool HTTP::Download(const std::string &IP, const std::string &Path) {
     std::string Ret = Get(IP);
     isDownload = false;
 
-    if(Ret.empty())return false;
+    if (Ret.empty())return false;
 
     std::ofstream File(Path, std::ios::binary);
-    if(File.is_open()) {
+    if (File.is_open()) {
         File << Ret;
         File.close();
         std::cout << "\n";
-        info("Download Complete!");
-    }else{
-        error("Failed to open file directory: " + Path);
+        log_info("Download Complete!");
+    } else {
+        log_error("Failed to open file directory: %s", Path);
         return false;
     }
 

@@ -14,3 +14,4 @@ std::string GetVer();
 std::string GetEN();
 void ConfigInit();
 extern bool Dev;
+extern bool Verbose;
