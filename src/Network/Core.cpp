@@ -55,13 +55,13 @@ void Parse(std::string Data, SOCKET CSocket) {
         case 'A':
             Data = Data.substr(0, 1);
             break;
-        case 'B':
+        case 'B': // Terminate Connection
             NetReset();
             Terminate = true;
             TCPTerminate = true;
             Data = Code + HTTP::Get("https://backend.beammp.com/servers-info");
             break;
-        case 'C':
+        case 'C': // Clear Mods
             ListOfMods.clear();
             StartSync(Data);
             while (ListOfMods.empty() && !Terminate) {
@@ -70,9 +70,9 @@ void Parse(std::string Data, SOCKET CSocket) {
             if (ListOfMods == "-")Data = "L";
             else Data = "L" + ListOfMods;
             break;
-        case 'U':
-            if (SubCode == 'l')Data = UlStatus;
-            if (SubCode == 'p') {
+        case 'U': // Magic stuff
+            if (SubCode == 'l') Data = UlStatus;
+            if (SubCode == 'p') { // Good ol' ping
                 if (ping > 800) {
                     Data = "Up-2";
                 } else Data = "Up" + std::to_string(ping);
@@ -84,10 +84,10 @@ void Parse(std::string Data, SOCKET CSocket) {
                 Data = std::string(UlStatus) + "\n" + "Up" + Ping;
             }
             break;
-        case 'M':
+        case 'M': // Set Mod Status (I think)
             Data = MStatus;
             break;
-        case 'Q':
+        case 'Q': // Quit? :thinking:
             if (SubCode == 'S') {
                 NetReset();
                 Terminate = true;
@@ -97,17 +97,17 @@ void Parse(std::string Data, SOCKET CSocket) {
             if (SubCode == 'G')exit(2);
             Data.clear();
             break;
-        case 'R': //will send mod name
+        case 'R': // Send Mod Name
             if (ConfList->find(Data) == ConfList->end()) {
                 ConfList->insert(Data);
                 ModLoaded = true;
             }
             Data.clear();
             break;
-        case 'Z':
+        case 'Z': // Version
             Data = "Z" + GetVer();
             break;
-        case 'N':
+        case 'N': // Login
             if (SubCode == 'c') {
                 Data = "N{\"Auth\":" + std::to_string(LoginAuth) + "}";
             } else {
@@ -118,7 +118,8 @@ void Parse(std::string Data, SOCKET CSocket) {
             Data.clear();
             break;
     }
-    if (!Data.empty() && CSocket != -1) {
+
+    if (!Data.empty() && CSocket != -1) { // Dead, rest in peace
         int res = send(CSocket, (Data + "\n").c_str(), int(Data.size()) + 1, 0);
         if (res < 0) {
             log_error("(Core) send failed with error: %s", wsa_get_err_str());
@@ -127,7 +128,6 @@ void Parse(std::string Data, SOCKET CSocket) {
 }
 
 void GameHandler(SOCKET Client) {
-
     int32_t Size, Temp, Rcv;
     char Header[10] = {0};
     do {
